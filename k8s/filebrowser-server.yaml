@@ -1,0 +1,165 @@
+# FileBrowser — web UI to browse / search / delete files in ${HOMELAB_DOCUMENTS_PATH}.
+# Exposed at https://files.<tailnet>.ts.net via Tailscale operator.
+#
+# Why this exists:
+#   docsify (the docs site) only renders markdown and is read-only.
+#   For browsing arbitrary documents (PDFs, docx, zips, etc.) with search
+#   and delete, we run FileBrowser as a separate app and link to it from
+#   the docsify sidebar.
+#
+# Default credentials on first launch: admin / admin — CHANGE IMMEDIATELY
+# via the web UI (Settings → Users → admin → password).
+#
+# Template variables (substituted by deploy.sh via envsubst):
+#   HOMELAB_NAMESPACE         — Kubernetes namespace (e.g. homelab)
+#   HOMELAB_DOCUMENTS_PATH    — Absolute path to the documents folder on the host Mac
+#                               (e.g. /Users/yourname/Documents)
+---
+# hostPath PV: bind-mount the Mac's Documents folder into the cluster.
+# Reuses the `local-hdd` storage class which is misleadingly named — it's
+# just our convention for hostPath PVs on the macOS side via virtiofs.
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: filebrowser-content-pv
+  labels:
+    app: filebrowser
+spec:
+  capacity:
+    storage: 100Gi
+  accessModes: [ReadWriteOnce]
+  persistentVolumeReclaimPolicy: Retain
+  storageClassName: local-hdd
+  hostPath:
+    path: ${HOMELAB_DOCUMENTS_PATH}
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: filebrowser-content-pvc
+  namespace: ${HOMELAB_NAMESPACE}
+spec:
+  accessModes: [ReadWriteOnce]
+  storageClassName: local-hdd
+  resources:
+    requests:
+      storage: 100Gi
+  selector:
+    matchLabels:
+      app: filebrowser
+---
+# Local-path PVC for the SQLite DB (user accounts, settings).
+# Lives inside the OrbStack VM ext4 — survives FileBrowser pod restarts.
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: filebrowser-db-pvc
+  namespace: ${HOMELAB_NAMESPACE}
+spec:
+  accessModes: [ReadWriteOnce]
+  storageClassName: local-path
+  resources:
+    requests:
+      storage: 1Gi
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: filebrowser
+  namespace: ${HOMELAB_NAMESPACE}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: filebrowser
+  template:
+    metadata:
+      labels:
+        app: filebrowser
+    spec:
+      # Run as root inside the container. The bind-mount into ~/Documents
+      # goes through virtiofs; macOS owns the file permissions. Running as
+      # root lets FileBrowser read/write any file the bind-mount exposes.
+      securityContext:
+        runAsUser: 0
+        runAsGroup: 0
+        fsGroup: 0
+      containers:
+        - name: filebrowser
+          image: filebrowser/filebrowser:v2.32.0
+          ports:
+            - containerPort: 80
+              name: http
+          env:
+            - name: FB_DATABASE
+              value: /database/filebrowser.db
+            - name: FB_ROOT
+              value: /srv
+            - name: FB_ADDRESS
+              value: 0.0.0.0
+            - name: FB_PORT
+              value: "80"
+            - name: FB_LOG
+              value: stdout
+          resources:
+            requests:
+              memory: "64Mi"
+              cpu: "50m"
+            limits:
+              memory: "512Mi"
+              cpu: "1"
+          volumeMounts:
+            - name: content
+              mountPath: /srv
+            - name: db
+              mountPath: /database
+          readinessProbe:
+            tcpSocket:
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 10
+            timeoutSeconds: 5
+          livenessProbe:
+            tcpSocket:
+              port: http
+            initialDelaySeconds: 30
+            periodSeconds: 30
+            timeoutSeconds: 5
+            failureThreshold: 5
+      volumes:
+        - name: content
+          persistentVolumeClaim:
+            claimName: filebrowser-content-pvc
+        - name: db
+          persistentVolumeClaim:
+            claimName: filebrowser-db-pvc
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: filebrowser
+  namespace: ${HOMELAB_NAMESPACE}
+spec:
+  type: ClusterIP
+  selector:
+    app: filebrowser
+  ports:
+    - port: 80
+      targetPort: http
+      name: http
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: filebrowser
+  namespace: ${HOMELAB_NAMESPACE}
+spec:
+  ingressClassName: tailscale
+  defaultBackend:
+    service:
+      name: filebrowser
+      port:
+        number: 80
+  tls:
+    - hosts:
+        - files
