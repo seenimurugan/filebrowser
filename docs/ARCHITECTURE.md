@@ -1,5 +1,7 @@
 # FileBrowser — architecture
 
+**On this page:** [Why it exists (the design decision)](#why-it-exists-the-design-decision) · [Deployment diagram](#deployment-diagram) · [Topology](#topology) · [Components](#components) · [Why the bind-mount strategy and not a copy](#why-the-bind-mount-strategy-and-not-a-copy) · [Why we run as root](#why-we-run-as-root) · [Auth model](#auth-model) · [Files in this repo](#files-in-this-repo)
+
 ## Why it exists (the design decision)
 
 The docs site uses [docsify](../docs-server/README.md), which is brilliant for rendering markdown but has hard limits:

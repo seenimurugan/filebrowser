@@ -1,5 +1,7 @@
 # FileBrowser — usage
 
+**On this page:** [Opening it](#opening-it) · [Daily operations](#daily-operations) · [Daily flow tips](#daily-flow-tips) · [What it's NOT for](#what-its-not-for)
+
 ## Opening it
 
 From any tailnet device: `https://files.stoat-perch.ts.net`
