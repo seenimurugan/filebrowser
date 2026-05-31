@@ -1,5 +1,7 @@
 # FileBrowser — maintenance
 
+**On this page:** [Restart the pod](#restart-the-pod) · [Logs](#logs) · [Update FileBrowser version](#update-filebrowser-version) · [Backup the database](#backup-the-database) · [Reset admin password (forgot it)](#reset-admin-password-forgot-it) · [Common issues](#common-issues) · [Stop FileBrowser](#stop-filebrowser) · [Uninstall completely](#uninstall-completely)
+
 ## Restart the pod
 
 ```bash
