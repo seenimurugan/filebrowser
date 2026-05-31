@@ -15,6 +15,17 @@ We need a second tool for the "browse / search / delete arbitrary files in `~/Do
 
 Docsify stays for markdown technical docs (what you're reading right now). FileBrowser handles everything else. The docsify sidebar has a link out to FileBrowser so they feel unified, but they're independent apps with independent URLs.
 
+## Deployment diagram
+
+```mermaid
+graph TD
+    A[Browser on Tailnet] -->|HTTPS| B[Tailscale Ingress\nfiles.stoat-perch.ts.net]
+    B --> C[filebrowser Service\nport 80]
+    C --> D[FileBrowser Pod\nfilebrowser/filebrowser:s6]
+    D -->|hostPath RW mount| E[Mac filesystem\n~/Documents/]
+    D -->|PVC RW| F[filebrowser-db-pvc\nSQLite DB local-path]
+```
+
 ## Topology
 
 ```

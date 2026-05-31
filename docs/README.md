@@ -1,46 +1,77 @@
 # FileBrowser — documents web UI
 
-[FileBrowser](https://filebrowser.org) is a self-hosted web UI that lets you browse, search, upload, rename, and delete arbitrary files. Deployed alongside the docs site to handle non-markdown documents (PDFs, docx, zips, ebooks, etc.) — things docsify can't serve.
+[FileBrowser](https://filebrowser.org) is a self-hosted web UI that lets you browse, search, upload, rename, and delete arbitrary files. Deployed alongside the docs site to handle non-markdown documents (PDFs, docx, zips, ebooks, etc.) — things Docsify can't serve. The entire `~/Documents/` folder on the Mac is exposed live via a hostPath bind-mount.
 
-## What it serves
+Source: `/Users/nila/Developer/apps/filebrowser/`
 
-The entire `~/Documents/` folder on the Mac, exposed live via a hostPath bind-mount. Any change made via the FileBrowser UI is reflected on the Mac filesystem immediately and vice versa.
+---
 
 ## Access
 
 | Where | URL |
 |---|---|
-| **iPhone / TV / family with Tailscale** | https://files.stoat-perch.ts.net |
-| **This Mac (browser, cluster DNS)** | http://filebrowser.homelab.svc.cluster.local |
-| **This Mac (localhost via port-forward)** | not configured by default |
-| **LAN devices (without Tailscale)** | not configured |
+| **iPhone / TV / family on Tailscale** | https://files.stoat-perch.ts.net |
+| **Cluster DNS** (other pods / Mac shell) | http://filebrowser.homelab.svc.cluster.local |
+| **Ad-hoc debug port-forward** | `kubectl -n homelab port-forward svc/filebrowser 8091:80` → http://localhost:8091 |
+
+---
 
 ## Initial credentials
 
 | | |
 |---|---|
 | User | `admin` |
-| Password | `admin` ⚠️ change immediately |
+| Password | `admin` |
 
-Change on first login: Settings (gear icon, top right) → Users → admin → set a new password → Save.
+**Change immediately** on first login: Settings (gear icon, top right) → Users → admin → set a new password → Save.
 
-## Detailed docs
+---
 
-- [📋 USAGE](USAGE.md) — browse, search, upload, delete, share links
-- [🛠 MAINTENANCE](MAINTENANCE.md) — restart, backup the DB, common issues
-- [🏛 ARCHITECTURE](ARCHITECTURE.md) — why FileBrowser + docsify split, how the bind-mount works, why root user
+## What it does
 
-## Quick tour
+- Browse, search, upload, rename, and delete files in `~/Documents/`.
+- Changes made via the UI are reflected on the Mac filesystem immediately and vice versa.
+- Complementary to the Docsify docs site: Docsify is read-only markdown; FileBrowser handles everything else.
 
-Top-level folders you'll see on first login (these are categorical buckets populated by [`categorize-docs.py`](../../configs/categorize-docs.py)):
+Top-level document categories (populated by `categorize-docs.py`):
 
-- `Bank & Finance/` — statements, transfer requests, IBANs
-- `ID & Personal Docs/` — passports, licenses, invitation letters
-- `Tax/` — P60, council tax, payslips
-- `Work & Career/` — employment, payslips, wisetech
-- `Books & Learning/` — AI/LLM ebooks, Arduino tutorials
-- `Installers/` — .dmg/.pkg/.exe (low priority, FB can ignore visually)
-- `Bills & Receipts/`, `Insurance/`, `Medical/`, `Legal & Contracts/`, `Travel/`, `Code Archives/`, `Manuals & Warranties/`
+- `Bank & Finance/`, `ID & Personal Docs/`, `Tax/`, `Work & Career/`, `Books & Learning/`
+- `Bills & Receipts/`, `Insurance/`, `Medical/`, `Legal & Contracts/`, `Travel/`
 - `Uncategorized/` — files the keyword classifier couldn't bucket; triage from the UI
-- `Arduino/` — left untouched as the original hardware-kit folder
-- `Autodesk/`, `EdgeTX/`, `Fusion 360/`, `OpenTX/`, `email-program/`, etc. — software product folders, untouched
+
+---
+
+## Stack & framework
+
+| Layer | Tech |
+|---|---|
+| App | FileBrowser (off-the-shelf, single Go binary) |
+| Container | `filebrowser/filebrowser:s6` |
+| Storage (documents) | hostPath PVC pointing at `$HOMELAB_DOCUMENTS_PATH` (`~/Documents/`) |
+| Storage (DB / config) | PVC on `local-path` (VM ext4) — FileBrowser's SQLite database |
+| Deploy | Kubernetes (`homelab` namespace), Tailscale Ingress |
+
+---
+
+## Storage
+
+Two PVCs:
+
+| PVC | Purpose |
+|---|---|
+| `filebrowser-content-pvc` | hostPath bind-mount of `$HOMELAB_DOCUMENTS_PATH` — the browsable files |
+| `filebrowser-db-pvc` | FileBrowser's SQLite database (user accounts, settings) on `local-path` |
+
+---
+
+## See also
+
+- [Usage guide](USAGE.md) — browse, search, upload, delete, share links
+- [Maintenance](MAINTENANCE.md) — restart, backup the DB, common issues
+- [Architecture](ARCHITECTURE.md) — why FileBrowser + Docsify split, how the bind-mount works
+
+## File reference
+
+| File | Purpose |
+|---|---|
+| `/Users/nila/Developer/apps/filebrowser/k8s/filebrowser-server.yaml` | Deployment + Service + Ingress + PV + PVC |
